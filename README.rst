@@ -64,6 +64,7 @@ There is currently only one command.
       --show-cycle-breakers  Identify a set of dependencies that, if removed,
                              would make the graph acyclic, and display them as
                              dashed lines.
+      --hide-acyclic         Hide submodules that are not part of a cycle.
       --help                 Show this message and exit.
 
 Draw a graph of the dependencies within any installed Python package or subpackage.
@@ -120,3 +121,17 @@ within ``django.db.utils``.
 Here you can see that two of the dependencies are shown as a dashed line. If these dependencies were to be
 removed, the graph would be acyclic. To decide on the cycle breakers, Impulse uses the
 `nominate_cycle_breakers method provided by Grimp <https://grimp.readthedocs.io/en/stable/usage.html#ImportGraph.nominate_cycle_breakers>`_.
+
+**Example with hide acyclic**
+
+.. code-block:: text
+
+    impulse drawgraph django.db --hide-acyclic
+
+.. image:: https://raw.githubusercontent.com/seddonym/impulse/master/docs/_static/images/django.db.hide-acyclic.png
+  :align: center
+  :alt: Graph of django.db package with acyclic submodules hidden.
+
+This hides all submodules that do not form part of any cycle, making it easier to focus on circular
+dependencies in larger packages. Combine this with ``--show-cycle-breakers`` for a condensed view
+of cycles and how they can be broken.

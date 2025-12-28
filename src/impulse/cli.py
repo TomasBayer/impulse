@@ -27,12 +27,23 @@ def main():
         "and display them as dashed lines."
     ),
 )
+@click.option(
+    "--hide-acyclic",
+    is_flag=True,
+    help="Hide submodules that are not part of a cycle.",
+)
 @click.argument("module_name", type=str)
-def drawgraph(module_name: str, show_import_totals: bool, show_cycle_breakers: bool) -> None:
+def drawgraph(
+    module_name: str,
+    show_import_totals: bool,
+    show_cycle_breakers: bool,
+    hide_acyclic: bool,
+) -> None:
     use_cases.draw_graph(
         module_name=module_name,
         show_import_totals=show_import_totals,
         show_cycle_breakers=show_cycle_breakers,
+        hide_acyclic=hide_acyclic,
         sys_path=sys.path,
         current_directory=os.getcwd(),
         get_top_level_package=adapters.get_top_level_package,

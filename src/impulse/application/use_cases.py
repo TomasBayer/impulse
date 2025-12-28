@@ -1,5 +1,6 @@
 from collections.abc import Set
 from collections.abc import Callable
+
 import grimp
 from impulse import ports, dotfile, graph
 
@@ -8,6 +9,7 @@ def draw_graph(
     module_name: str,
     show_import_totals: bool,
     show_cycle_breakers: bool,
+    hide_acyclic: bool,
     sys_path: list[str],
     current_directory: str,
     get_top_level_package: Callable[[str], str],
@@ -20,6 +22,7 @@ def draw_graph(
         module_name: the package or subpackage name of any importable Python package.
         show_import_totals: whether to label the arrows with the total number of imports they represent.
         show_cycle_breakers: marks a set of dependencies that, if removed, would make the graph acyclic.
+        hide_acyclic: whether to hide submodules that are not part of a cycle.
         sys_path: the sys.path list (or a test double).
         current_directory: the current working directory.
         get_top_level_package: the function to retrieve the top level package name. This will usually be the first part
@@ -34,13 +37,24 @@ def draw_graph(
     top_level_package = get_top_level_package(module_name)
     grimp_graph = build_graph(top_level_package)
 
-    dot = _build_dot(grimp_graph, module_name, show_import_totals, show_cycle_breakers)
+    dot = _build_dot(
+        grimp_graph,
+        module_name,
+        show_import_totals,
+        show_cycle_breakers,
+        hide_acyclic,
+    )
 
     viewer.view(dot)
 
 
 class _DotGraphBuildStrategy:
-    def build(self, module_name: str, grimp_graph: grimp.ImportGraph) -> dotfile.DotGraph:
+    def build(
+        self,
+        module_name: str,
+        grimp_graph: grimp.ImportGraph,
+        hide_acyclic: bool,
+    ) -> dotfile.DotGraph:
         children = grimp_graph.find_children(module_name)
 
         self.prepare_graph(grimp_graph, children)
@@ -51,6 +65,9 @@ class _DotGraphBuildStrategy:
                 grimp_graph, upstream, downstream
             ),
         )
+
+        if hide_acyclic:
+            presentation_graph = presentation_graph.remove_acyclic_vertices()
 
         dot = dotfile.DotGraph(title=module_name, concentrate=self.should_concentrate())
 
@@ -196,6 +213,7 @@ def _build_dot(
     module_name: str,
     show_import_totals: bool,
     show_cycle_breakers: bool,
+    hide_acyclic: bool,
 ) -> dotfile.DotGraph:
     strategy: _DotGraphBuildStrategy
     if show_import_totals or show_cycle_breakers:
@@ -207,4 +225,4 @@ def _build_dot(
     else:
         strategy = _ModuleSquashingBuildStrategy()
 
-    return strategy.build(module_name, grimp_graph)
+    return strategy.build(module_name, grimp_graph, hide_acyclic)

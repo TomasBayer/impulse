@@ -75,6 +75,7 @@ class TestDrawGraph:
             SOME_MODULE,
             show_import_totals=False,
             show_cycle_breakers=False,
+            hide_acyclic=False,
             sys_path=sys_path,
             current_directory=current_directory,
             get_top_level_package=fake_get_top_level_package_non_namespace,
@@ -120,6 +121,7 @@ class TestDrawGraph:
             "some.namespace.foo.blue",
             show_import_totals=False,
             show_cycle_breakers=False,
+            hide_acyclic=False,
             sys_path=[],
             current_directory="/cwd",
             get_top_level_package=get_top_level_package,
@@ -134,6 +136,7 @@ class TestDrawGraph:
             SOME_MODULE,
             show_import_totals=True,
             show_cycle_breakers=False,
+            hide_acyclic=False,
             sys_path=[],
             current_directory="/cwd",
             get_top_level_package=fake_get_top_level_package_non_namespace,
@@ -156,6 +159,7 @@ class TestDrawGraph:
             SOME_MODULE,
             show_import_totals=False,
             show_cycle_breakers=True,
+            hide_acyclic=False,
             sys_path=[],
             current_directory="/cwd",
             get_top_level_package=fake_get_top_level_package_non_namespace,
@@ -178,4 +182,29 @@ class TestDrawGraph:
                 "mypackage.foo.red",
             ),
             Edge("mypackage.foo.red", "mypackage.foo.blue", emphasized=True),
+        }
+
+    def test_draw_graph_hide_acyclic(self):
+        viewer = SpyGraphViewer()
+
+        use_cases.draw_graph(
+            SOME_MODULE,
+            show_import_totals=False,
+            show_cycle_breakers=False,
+            hide_acyclic=True,
+            sys_path=[],
+            current_directory="/cwd",
+            get_top_level_package=fake_get_top_level_package_non_namespace,
+            build_graph=build_fake_graph,
+            viewer=viewer,
+        )
+
+        # The only cycle in the test graph is formed by blue and red.
+        assert viewer.called_with_dot.nodes == {
+            "mypackage.foo.blue",
+            "mypackage.foo.red",
+        }
+        assert viewer.called_with_dot.edges == {
+            Edge("mypackage.foo.blue", "mypackage.foo.red"),
+            Edge("mypackage.foo.red", "mypackage.foo.blue"),
         }
