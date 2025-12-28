@@ -50,7 +50,8 @@ class _DotGraphBuildStrategy:
         for child in children:
             dot.add_node(child)
         for upstream, downstream in itertools.permutations(children, r=2):
-            if edge := self.build_edge(grimp_graph, upstream, downstream):
+            if self.has_edge(grimp_graph, upstream, downstream):
+                edge = self.build_edge(grimp_graph, upstream, downstream)
                 dot.add_edge(edge)
 
         return dot
@@ -61,9 +62,12 @@ class _DotGraphBuildStrategy:
     def prepare_graph(self, grimp_graph: grimp.ImportGraph, children: Set[str]) -> None:
         pass
 
+    def has_edge(self, grimp_graph: grimp.ImportGraph, upstream: str, downstream: str) -> bool:
+        raise NotImplementedError
+
     def build_edge(
         self, grimp_graph: grimp.ImportGraph, upstream: str, downstream: str
-    ) -> dotfile.Edge | None:
+    ) -> dotfile.Edge:
         raise NotImplementedError
 
 
@@ -74,12 +78,13 @@ class _ModuleSquashingBuildStrategy(_DotGraphBuildStrategy):
         for child in children:
             grimp_graph.squash_module(child)
 
+    def has_edge(self, grimp_graph: grimp.ImportGraph, upstream: str, downstream: str) -> bool:
+        return grimp_graph.direct_import_exists(importer=downstream, imported=upstream)
+
     def build_edge(
         self, grimp_graph: grimp.ImportGraph, upstream: str, downstream: str
-    ) -> dotfile.Edge | None:
-        if grimp_graph.direct_import_exists(importer=downstream, imported=upstream):
-            return dotfile.Edge(source=downstream, destination=upstream)
-        return None
+    ) -> dotfile.Edge:
+        return dotfile.Edge(source=downstream, destination=upstream)
 
 
 class _ImportExpressionBuildStrategy(_DotGraphBuildStrategy):
@@ -128,31 +133,32 @@ class _ImportExpressionBuildStrategy(_DotGraphBuildStrategy):
                 return ancestor
         return None
 
+    def has_edge(self, grimp_graph: grimp.ImportGraph, upstream: str, downstream: str) -> bool:
+        return grimp_graph.direct_import_exists(
+            importer=downstream, imported=upstream, as_packages=True
+        )
+
     def build_edge(
         self, grimp_graph: grimp.ImportGraph, upstream: str, downstream: str
-    ) -> dotfile.Edge | None:
-        if grimp_graph.direct_import_exists(
-            importer=downstream, imported=upstream, as_packages=True
-        ):
-            if self.show_import_totals:
-                number_of_imports = self._count_imports_between_packages(
-                    grimp_graph, importer=downstream, imported=upstream
-                )
-                label = str(number_of_imports)
-            else:
-                label = ""
-
-            if self.show_cycle_breakers:
-                assert self.cycle_breakers is not None
-                is_cycle_breaker = (downstream, upstream) in self.cycle_breakers
-                emphasized = is_cycle_breaker
-            else:
-                emphasized = False
-
-            return dotfile.Edge(
-                source=downstream, destination=upstream, label=label, emphasized=emphasized
+    ) -> dotfile.Edge:
+        if self.show_import_totals:
+            number_of_imports = self._count_imports_between_packages(
+                grimp_graph, importer=downstream, imported=upstream
             )
-        return None
+            label = str(number_of_imports)
+        else:
+            label = ""
+
+        if self.show_cycle_breakers:
+            assert self.cycle_breakers is not None
+            is_cycle_breaker = (downstream, upstream) in self.cycle_breakers
+            emphasized = is_cycle_breaker
+        else:
+            emphasized = False
+
+        return dotfile.Edge(
+            source=downstream, destination=upstream, label=label, emphasized=emphasized
+        )
 
     @staticmethod
     def _count_imports_between_packages(
