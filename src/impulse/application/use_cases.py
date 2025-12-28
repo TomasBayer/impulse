@@ -1,8 +1,7 @@
 from collections.abc import Set
 from collections.abc import Callable
-import itertools
 import grimp
-from impulse import ports, dotfile
+from impulse import ports, dotfile, graph
 
 
 def draw_graph(
@@ -46,13 +45,21 @@ class _DotGraphBuildStrategy:
 
         self.prepare_graph(grimp_graph, children)
 
+        presentation_graph = graph.DirectedGraphWithoutLoops.from_adjacency_condition(
+            vertices=children,
+            is_adjacent=lambda upstream, downstream: self.has_edge(
+                grimp_graph, upstream, downstream
+            ),
+        )
+
         dot = dotfile.DotGraph(title=module_name, concentrate=self.should_concentrate())
-        for child in children:
-            dot.add_node(child)
-        for upstream, downstream in itertools.permutations(children, r=2):
-            if self.has_edge(grimp_graph, upstream, downstream):
-                edge = self.build_edge(grimp_graph, upstream, downstream)
-                dot.add_edge(edge)
+
+        for vertex in presentation_graph.vertices:
+            dot.add_node(vertex)
+
+        for upstream, downstream in presentation_graph.iter_edges():
+            dot_edge = self.build_edge(grimp_graph, upstream, downstream)
+            dot.add_edge(dot_edge)
 
         return dot
 
