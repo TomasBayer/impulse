@@ -25,3 +25,13 @@ class DirectedGraphWithoutLoops(Generic[V]):
         for from_vertex in self._adjacency_map:
             for to_vertex in self._adjacency_map[from_vertex]:
                 yield from_vertex, to_vertex
+
+    def remove_vertices(self, vertices_to_remove: set[V]) -> "DirectedGraphWithoutLoops[V]":
+        new_vertices = frozenset(self.vertices - vertices_to_remove)
+        return self.__class__(
+            vertices=new_vertices,
+            _adjacency_map={
+                from_vertex: self._adjacency_map[from_vertex] - vertices_to_remove
+                for from_vertex in new_vertices
+            },
+        )
