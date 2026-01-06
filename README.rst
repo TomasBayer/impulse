@@ -56,7 +56,7 @@ There is currently only one command.
 
 .. code-block:: text
 
-    Usage: impulse drawgraph [OPTIONS] MODULE_NAME
+    Usage: impulse drawgraph [OPTIONS] MODULE_NAME...
 
     Options:
       --show-import-totals   Label arrows with the number of imports they
@@ -71,6 +71,9 @@ There is currently only one command.
       --help                 Show this message and exit.
 
 Draw a graph of the dependencies within any installed Python package or subpackage.
+
+You can provide one or more module names to visualize multiple packages simultaneously, including dependencies between
+them.
 
 The graph shows the relationship between all the immediate children of the package. An arrow indicates that there is
 at least one import by the child (or any of its descendants) from the subpackage where the arrow points.

@@ -38,6 +38,17 @@ class ModuleTreeNode:
         return frozenset(self.get_leaves())
 
     @classmethod
+    def build_children(
+        cls,
+        children: Iterable[str],
+        children_getter: Callable[[str], Iterable[str]],
+        max_depth: int,
+    ) -> ModuleTreeNode:
+        return cls(
+            "ROOT", frozenset(cls.build(child, children_getter, max_depth) for child in children)
+        )
+
+    @classmethod
     def build(
         cls, root_module_path: str, children_getter: Callable[[str], Iterable[str]], max_depth: int
     ) -> ModuleTreeNode:
@@ -105,7 +116,7 @@ class ModuleTreeNode:
 
         As a result, every edge is added exactly once, at the lowest common ancestor of its two endpoints.
         """
-        dot_graph = build_dotgraph(self.module_path if depth == 0 else self.module_name)
+        dot_graph = build_dotgraph(self.module_path if depth == 1 else self.module_name)
 
         for child in self.children:
             if not child.is_leaf():

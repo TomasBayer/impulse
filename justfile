@@ -15,6 +15,7 @@ test:
     @uv run impulse drawgraph grimp --show-import-totals
     @uv run --with=django impulse drawgraph django.db --show-cycle-breakers
     @uv run --with=django impulse drawgraph django.db --depth=2
+    @uv run --with=django impulse drawgraph django.db django.forms
 
 
 # Run tests under all supported Python versions.

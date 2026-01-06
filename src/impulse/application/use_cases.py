@@ -6,7 +6,7 @@ from impulse import ports, dotfile, tree
 
 
 def draw_graph(
-    module_name: str,
+    module_names: tuple[str, ...],
     show_import_totals: bool,
     show_cycle_breakers: bool,
     depth: int,
@@ -17,9 +17,9 @@ def draw_graph(
     viewer: ports.GraphViewer,
 ) -> None:
     """
-    Create a file showing a graph of the supplied package.
+    Create a file showing a graph of the supplied package(s).
     Args:
-        module_name: the package or subpackage name of any importable Python package.
+        module_names: one or more package or subpackage names of importable Python packages.
         show_import_totals: whether to label the arrows with the total number of imports they represent.
         show_cycle_breakers: marks a set of dependencies that, if removed, would make the graph acyclic.
         depth: depth of module hierarchy to visualize
@@ -34,10 +34,12 @@ def draw_graph(
     # Add current directory to the path, as this doesn't happen automatically.
     sys_path.insert(0, current_directory)
 
-    top_level_package = get_top_level_package(module_name)
-    grimp_graph = build_graph(top_level_package)
+    # Get all unique top-level packages
+    top_level_packages = {get_top_level_package(module_name) for module_name in module_names}
 
-    dot = _build_dot(grimp_graph, module_name, show_import_totals, show_cycle_breakers, depth)
+    grimp_graph = build_graph(*top_level_packages)
+
+    dot = _build_dot(grimp_graph, module_names, show_import_totals, show_cycle_breakers, depth)
 
     viewer.view(dot)
 
@@ -45,11 +47,13 @@ def draw_graph(
 class _DotGraphBuildStrategy:
     def build(
         self,
-        module_name: str,
+        module_names: tuple[str, ...],
         grimp_graph: grimp.ImportGraph,
         depth: int = 1,
     ) -> dotfile.DotGraph:
-        module_tree = tree.ModuleTreeNode.build(module_name, grimp_graph.find_children, depth)
+        module_tree = tree.ModuleTreeNode.build_children(
+            module_names, grimp_graph.find_children, depth
+        )
 
         self.prepare_graph(grimp_graph, module_tree.leaves)
 
@@ -106,9 +110,9 @@ class _ImportExpressionBuildStrategy(_DotGraphBuildStrategy):
     """
 
     def __init__(
-        self, *, module_name: str, show_import_totals: bool, show_cycle_breakers: bool
+        self, *, module_names: tuple[str, ...], show_import_totals: bool, show_cycle_breakers: bool
     ) -> None:
-        self.module_name = module_name
+        self.module_names = module_names
         self.show_import_totals = show_import_totals
         self.show_cycle_breakers = show_cycle_breakers
         self.cycle_breakers: set[tuple[str, str]] | None = None
@@ -129,13 +133,14 @@ class _ImportExpressionBuildStrategy(_DotGraphBuildStrategy):
         # In the form (importer, imported).
         coarse_grained_cycle_breakers: set[tuple[str, str]] = set()
 
-        for fine_grained_cycle_breaker in grimp_graph.nominate_cycle_breakers(self.module_name):
-            importer, imported = fine_grained_cycle_breaker
-            importer_ancestor = self._get_self_or_ancestor(candidate=importer, ancestors=nodes)
-            imported_ancestor = self._get_self_or_ancestor(candidate=imported, ancestors=nodes)
+        for module_name in self.module_names:
+            for fine_grained_cycle_breaker in grimp_graph.nominate_cycle_breakers(module_name):
+                importer, imported = fine_grained_cycle_breaker
+                importer_ancestor = self._get_self_or_ancestor(candidate=importer, ancestors=nodes)
+                imported_ancestor = self._get_self_or_ancestor(candidate=imported, ancestors=nodes)
 
-            if importer_ancestor and imported_ancestor:
-                coarse_grained_cycle_breakers.add((importer_ancestor, imported_ancestor))
+                if importer_ancestor and imported_ancestor:
+                    coarse_grained_cycle_breakers.add((importer_ancestor, imported_ancestor))
 
         return coarse_grained_cycle_breakers
 
@@ -201,7 +206,7 @@ class _ImportExpressionBuildStrategy(_DotGraphBuildStrategy):
 
 def _build_dot(
     grimp_graph: grimp.ImportGraph,
-    module_name: str,
+    module_names: tuple[str, ...],
     show_import_totals: bool,
     show_cycle_breakers: bool,
     depth: int,
@@ -209,11 +214,11 @@ def _build_dot(
     strategy: _DotGraphBuildStrategy
     if show_import_totals or show_cycle_breakers:
         strategy = _ImportExpressionBuildStrategy(
-            module_name=module_name,
+            module_names=module_names,
             show_import_totals=show_import_totals,
             show_cycle_breakers=show_cycle_breakers,
         )
     else:
         strategy = _ModuleSquashingBuildStrategy()
 
-    return strategy.build(module_name, grimp_graph, depth)
+    return strategy.build(module_names, grimp_graph, depth)

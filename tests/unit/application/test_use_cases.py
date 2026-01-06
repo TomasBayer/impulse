@@ -13,7 +13,7 @@ def fake_get_top_level_package_non_namespace(module_name: str) -> str:
     return module_name.split(".")[0]
 
 
-def build_fake_graph(package_name: str) -> grimp.ImportGraph:
+def build_fake_graph(package_name: str, *additional_package_names: str) -> grimp.ImportGraph:
     graph = grimp.ImportGraph()
     graph.add_module(package_name)
 
@@ -72,7 +72,7 @@ class TestDrawGraph:
         viewer = SpyGraphViewer()
 
         use_cases.draw_graph(
-            SOME_MODULE,
+            (SOME_MODULE,),
             show_import_totals=False,
             show_cycle_breakers=False,
             depth=1,
@@ -87,15 +87,17 @@ class TestDrawGraph:
         assert sys_path == [current_directory, *original_sys_path]
         # The image generation function was called.
         assert viewer.called_with_dot, "Viewer not called."
-        assert viewer.called_with_dot.title == SOME_MODULE
-        assert viewer.called_with_dot.concentrate is True
-        assert viewer.called_with_dot.nodes == {
+        # Get the first-level submodule subgraph (mypackage.foo)
+        subgraph = next(sg for sg in viewer.called_with_dot.subgraphs)
+        assert subgraph.title == SOME_MODULE
+        assert subgraph.concentrate is True
+        assert subgraph.nodes == {
             "mypackage.foo.green",
             "mypackage.foo.blue",
             "mypackage.foo.yellow",
             "mypackage.foo.red",
         }
-        assert viewer.called_with_dot.edges == {
+        assert subgraph.edges == {
             Edge("mypackage.foo.blue", "mypackage.foo.green"),
             Edge("mypackage.foo.green", "mypackage.foo.yellow"),
             Edge("mypackage.foo.blue", "mypackage.foo.red"),
@@ -106,7 +108,9 @@ class TestDrawGraph:
         def get_top_level_package(module: str) -> str:
             return "some.namespace"
 
-        def asserting_build_graph(top_level_package: str) -> grimp.ImportGraph:
+        def asserting_build_graph(
+            top_level_package: str, *additional_package_names: str
+        ) -> grimp.ImportGraph:
             assert top_level_package == "some.namespace"
             graph = grimp.ImportGraph()
             graph.add_module("some.namespace")
@@ -118,7 +122,7 @@ class TestDrawGraph:
 
         viewer = SpyGraphViewer()
         use_cases.draw_graph(
-            "some.namespace.foo.blue",
+            ("some.namespace.foo.blue",),
             show_import_totals=False,
             show_cycle_breakers=False,
             depth=1,
@@ -133,7 +137,7 @@ class TestDrawGraph:
         viewer = SpyGraphViewer()
 
         use_cases.draw_graph(
-            SOME_MODULE,
+            (SOME_MODULE,),
             show_import_totals=True,
             show_cycle_breakers=False,
             depth=1,
@@ -144,8 +148,9 @@ class TestDrawGraph:
             viewer=viewer,
         )
 
-        assert viewer.called_with_dot.concentrate is False
-        assert viewer.called_with_dot.edges == {
+        subgraph = next(sg for sg in viewer.called_with_dot.subgraphs)
+        assert subgraph.concentrate is False
+        assert subgraph.edges == {
             Edge("mypackage.foo.blue", "mypackage.foo.green", label="1"),
             Edge("mypackage.foo.green", "mypackage.foo.yellow", label="1"),
             Edge("mypackage.foo.blue", "mypackage.foo.red", label="4"),
@@ -156,7 +161,7 @@ class TestDrawGraph:
         viewer = SpyGraphViewer()
 
         use_cases.draw_graph(
-            SOME_MODULE,
+            (SOME_MODULE,),
             show_import_totals=False,
             show_cycle_breakers=True,
             depth=1,
@@ -167,8 +172,9 @@ class TestDrawGraph:
             viewer=viewer,
         )
 
-        assert viewer.called_with_dot.concentrate is False
-        assert viewer.called_with_dot.edges == {
+        subgraph = next(sg for sg in viewer.called_with_dot.subgraphs)
+        assert subgraph.concentrate is False
+        assert subgraph.edges == {
             Edge(
                 "mypackage.foo.blue",
                 "mypackage.foo.green",
@@ -185,8 +191,6 @@ class TestDrawGraph:
         }
 
     def test_draw_graph_with_depth_2(self):
-        """Test that depth=2 creates nested subgraph structure."""
-
         def build_depth_graph(
             package_name: str, *additional_package_names: str
         ) -> grimp.ImportGraph:
@@ -221,7 +225,7 @@ class TestDrawGraph:
         viewer = SpyGraphViewer()
 
         use_cases.draw_graph(
-            "mypackage.foo",
+            ("mypackage.foo",),
             show_import_totals=False,
             show_cycle_breakers=False,
             depth=2,
@@ -232,12 +236,19 @@ class TestDrawGraph:
             viewer=viewer,
         )
 
-        assert viewer.called_with_dot.title == "mypackage.foo"
-        assert len(viewer.called_with_dot.subgraphs) == 2
+        assert len(viewer.called_with_dot.subgraphs) == 1
+
+        # Find the mypackage.foo subgraph
+        subgraph = next(
+            sg for sg in viewer.called_with_dot.subgraphs if sg.title == "mypackage.foo"
+        )
+
+        # Verify nested subgraphs
+        assert len(subgraph.subgraphs) == 2
 
         # Find the blue and red subgraphs
-        blue_subgraph = next(sg for sg in viewer.called_with_dot.subgraphs if sg.title == ".blue")
-        red_subgraph = next(sg for sg in viewer.called_with_dot.subgraphs if sg.title == ".red")
+        blue_subgraph = next(sg for sg in subgraph.subgraphs if sg.title == ".blue")
+        red_subgraph = next(sg for sg in subgraph.subgraphs if sg.title == ".red")
 
         # Verify nodes in nested subgraphs
         assert blue_subgraph.nodes == {
@@ -253,6 +264,51 @@ class TestDrawGraph:
             Edge("mypackage.foo.blue.alpha", "mypackage.foo.blue.beta"),
         }
 
-        assert viewer.called_with_dot.edges == {
+        assert subgraph.edges == {
             Edge("mypackage.foo.blue.alpha", "mypackage.foo.red.gamma"),
+        }
+
+    def test_draw_graph_multiple_modules(self):
+        def build_multi_module_graph(
+            package_name: str, *additional_package_names: str
+        ) -> grimp.ImportGraph:
+            result = grimp.ImportGraph()
+            result.add_module("pkg1")
+            result.add_module("pkg1.module_a")
+            result.add_module("pkg1.module_b")
+            result.add_module("pkg2")
+            result.add_module("pkg2.module_c")
+            result.add_import(importer="pkg1.module_a", imported="pkg1.module_b")
+            result.add_import(importer="pkg1.module_a", imported="pkg2.module_c")
+            result.add_import(importer="pkg1.module_b", imported="pkg2.module_c")
+            return result
+
+        viewer = SpyGraphViewer()
+
+        use_cases.draw_graph(
+            ("pkg1", "pkg2"),
+            show_import_totals=False,
+            show_cycle_breakers=False,
+            depth=1,
+            sys_path=[],
+            current_directory="/cwd",
+            get_top_level_package=fake_get_top_level_package_non_namespace,
+            build_graph=build_multi_module_graph,
+            viewer=viewer,
+        )
+
+        assert len(viewer.called_with_dot.subgraphs) == 2
+
+        pkg1_subgraph = next(sg for sg in viewer.called_with_dot.subgraphs if sg.title == "pkg1")
+        pkg2_subgraph = next(sg for sg in viewer.called_with_dot.subgraphs if sg.title == "pkg2")
+
+        assert pkg1_subgraph.nodes == {"pkg1.module_a", "pkg1.module_b"}
+        assert pkg1_subgraph.edges == {
+            Edge("pkg1.module_a", "pkg1.module_b"),
+        }
+        assert pkg2_subgraph.nodes == {"pkg2.module_c"}
+
+        assert viewer.called_with_dot.edges == {
+            Edge("pkg1.module_a", "pkg2.module_c"),
+            Edge("pkg1.module_b", "pkg2.module_c"),
         }

@@ -33,12 +33,12 @@ def main():
     default=1,
     help="Depth of module hierarchy to visualize.",
 )
-@click.argument("module_name", type=str)
+@click.argument("module_names", type=str, nargs=-1, required=True)
 def drawgraph(
-    module_name: str, show_import_totals: bool, show_cycle_breakers: bool, depth: int
+    module_names: tuple[str, ...], show_import_totals: bool, show_cycle_breakers: bool, depth: int
 ) -> None:
     use_cases.draw_graph(
-        module_name=module_name,
+        module_names=module_names,
         show_import_totals=show_import_totals,
         show_cycle_breakers=show_cycle_breakers,
         depth=depth,
