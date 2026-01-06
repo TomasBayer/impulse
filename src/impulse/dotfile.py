@@ -70,7 +70,7 @@ class DotGraph:
         return dedent(f"""{graph_type} {{
             node [fontname=helvetica]
             {"concentrate=true" if self.concentrate else ""}
-            {f'label="{DotGraph.render_module(self.title)}"' if as_subgraph else ""}
+            {f'label="{self.title}"' if as_subgraph else ""}
             {self._render_nodes()}
             {self._render_edges()}
             {self._render_subgraphs()}

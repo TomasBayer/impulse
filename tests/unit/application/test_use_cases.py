@@ -75,6 +75,7 @@ class TestDrawGraph:
             SOME_MODULE,
             show_import_totals=False,
             show_cycle_breakers=False,
+            depth=1,
             sys_path=sys_path,
             current_directory=current_directory,
             get_top_level_package=fake_get_top_level_package_non_namespace,
@@ -120,6 +121,7 @@ class TestDrawGraph:
             "some.namespace.foo.blue",
             show_import_totals=False,
             show_cycle_breakers=False,
+            depth=1,
             sys_path=[],
             current_directory="/cwd",
             get_top_level_package=get_top_level_package,
@@ -134,6 +136,7 @@ class TestDrawGraph:
             SOME_MODULE,
             show_import_totals=True,
             show_cycle_breakers=False,
+            depth=1,
             sys_path=[],
             current_directory="/cwd",
             get_top_level_package=fake_get_top_level_package_non_namespace,
@@ -156,6 +159,7 @@ class TestDrawGraph:
             SOME_MODULE,
             show_import_totals=False,
             show_cycle_breakers=True,
+            depth=1,
             sys_path=[],
             current_directory="/cwd",
             get_top_level_package=fake_get_top_level_package_non_namespace,
@@ -178,4 +182,77 @@ class TestDrawGraph:
                 "mypackage.foo.red",
             ),
             Edge("mypackage.foo.red", "mypackage.foo.blue", emphasized=True),
+        }
+
+    def test_draw_graph_with_depth_2(self):
+        """Test that depth=2 creates nested subgraph structure."""
+
+        def build_depth_graph(
+            package_name: str, *additional_package_names: str
+        ) -> grimp.ImportGraph:
+            """Build graph with 2 levels of nesting."""
+            graph = grimp.ImportGraph()
+
+            # Root module
+            graph.add_module("mypackage")
+            graph.add_module("mypackage.foo")
+
+            # Level 1: immediate children of foo
+            graph.add_module("mypackage.foo.blue")
+            graph.add_module("mypackage.foo.red")
+
+            # Level 2: grandchildren of foo
+            graph.add_module("mypackage.foo.blue.alpha")
+            graph.add_module("mypackage.foo.blue.beta")
+            graph.add_module("mypackage.foo.red.gamma")
+
+            # Add some imports
+            graph.add_import(
+                importer="mypackage.foo.blue.alpha",
+                imported="mypackage.foo.red.gamma",
+            )
+            graph.add_import(
+                importer="mypackage.foo.blue.alpha",
+                imported="mypackage.foo.blue.beta",
+            )
+
+            return graph
+
+        viewer = SpyGraphViewer()
+
+        use_cases.draw_graph(
+            "mypackage.foo",
+            show_import_totals=False,
+            show_cycle_breakers=False,
+            depth=2,
+            sys_path=[],
+            current_directory="/cwd",
+            get_top_level_package=fake_get_top_level_package_non_namespace,
+            build_graph=build_depth_graph,
+            viewer=viewer,
+        )
+
+        assert viewer.called_with_dot.title == "mypackage.foo"
+        assert len(viewer.called_with_dot.subgraphs) == 2
+
+        # Find the blue and red subgraphs
+        blue_subgraph = next(sg for sg in viewer.called_with_dot.subgraphs if sg.title == ".blue")
+        red_subgraph = next(sg for sg in viewer.called_with_dot.subgraphs if sg.title == ".red")
+
+        # Verify nodes in nested subgraphs
+        assert blue_subgraph.nodes == {
+            "mypackage.foo.blue.alpha",
+            "mypackage.foo.blue.beta",
+        }
+        assert red_subgraph.nodes == {
+            "mypackage.foo.red.gamma",
+        }
+
+        # Verify edges are in the appropriate subgraphs
+        assert blue_subgraph.edges == {
+            Edge("mypackage.foo.blue.alpha", "mypackage.foo.blue.beta"),
+        }
+
+        assert viewer.called_with_dot.edges == {
+            Edge("mypackage.foo.blue.alpha", "mypackage.foo.red.gamma"),
         }

@@ -64,6 +64,10 @@ There is currently only one command.
       --show-cycle-breakers  Identify a set of dependencies that, if removed,
                              would make the graph acyclic, and display them as
                              dashed lines.
+      --depth INTEGER        Depth of module hierarchy to visualize. 0 shows
+                             only root modules, 1 shows immediate children
+                             (default), 2 shows nested subgraphs with
+                             grandchildren, etc.
       --help                 Show this message and exit.
 
 Draw a graph of the dependencies within any installed Python package or subpackage.

@@ -1,6 +1,10 @@
 Changelog
 =========
 
+latest
+----------------
+* Add --depth flag to visualize hierarchical module structures with nested subgraph clusters.
+
 2.2 (2025-12-12)
 ----------------
 
